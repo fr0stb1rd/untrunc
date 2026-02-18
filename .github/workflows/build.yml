@@ -9,7 +9,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Fetch the latest FFmpeg release version once, share with all build jobs
   get-ffmpeg-version:
     name: Get Latest FFmpeg Version
     runs-on: ubuntu-latest
@@ -24,96 +23,40 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
   build-linux:
-    name: Linux (${{ matrix.arch }}, ${{ matrix.ffmpeg_mode }})
+    name: Linux (${{ matrix.arch }})
     runs-on: ubuntu-latest
     needs: get-ffmpeg-version
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - arch: amd64
             platform: linux/amd64
             image: debian:12-slim
-            ffmpeg_mode: dynamic
-            always: true
-          - arch: amd64
-            platform: linux/amd64
-            image: debian:12-slim
-            ffmpeg_mode: static
-            always: true
           - arch: arm64
             platform: linux/arm64
             image: debian:12-slim
-            ffmpeg_mode: dynamic
-            always: false
-          - arch: arm64
-            platform: linux/arm64
-            image: debian:12-slim
-            ffmpeg_mode: static
-            always: false
           - arch: armv7
             platform: linux/arm/v7
             image: debian:12-slim
-            ffmpeg_mode: dynamic
-            always: false
-          - arch: armv7
-            platform: linux/arm/v7
-            image: debian:12-slim
-            ffmpeg_mode: static
-            always: false
           - arch: i386
             platform: linux/386
             image: i386/debian:12-slim
-            ffmpeg_mode: dynamic
-            always: false
-          - arch: i386
-            platform: linux/386
-            image: i386/debian:12-slim
-            ffmpeg_mode: static
-            always: false
 
     steps:
-      - name: Check if this job should run
-        id: should-run
-        run: |
-          IS_TAG=${{ startsWith(github.ref, 'refs/tags/') }}
-          ALWAYS=${{ matrix.always }}
-          if [ "$IS_TAG" = "true" ] || [ "$ALWAYS" = "true" ]; then
-            echo "run=true" >> $GITHUB_OUTPUT
-          else
-            echo "run=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: Checkout Code
-        if: steps.should-run.outputs.run == 'true'
         uses: actions/checkout@v4
 
       - name: Set up QEMU
-        if: steps.should-run.outputs.run == 'true'
         uses: docker/setup-qemu-action@v3
 
-      - name: Cache FFmpeg tarball (static only)
-        if: steps.should-run.outputs.run == 'true' && matrix.ffmpeg_mode == 'static'
+      - name: Cache FFmpeg tarball
         uses: actions/cache@v4
         with:
           path: /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz
-          key: ffmpeg-tarball-${{ needs.get-ffmpeg-version.outputs.version }}
+          key: ffmpeg-tarball-linux-${{ matrix.arch }}-${{ needs.get-ffmpeg-version.outputs.version }}
 
-      - name: Build (dynamic) inside Docker
-        if: steps.should-run.outputs.run == 'true' && matrix.ffmpeg_mode == 'dynamic'
-        run: |
-          docker run --rm --platform ${{ matrix.platform }} \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            ${{ matrix.image }} /bin/bash -c "
-              apt-get update && \
-              apt-get install -y libavformat-dev libavcodec-dev libavutil-dev libswscale-dev g++ make && \
-              make IS_RELEASE=1 && \
-              mv untrunc untrunc-linux-${{ matrix.arch }}
-            "
-
-      - name: Build (static) inside Docker
-        if: steps.should-run.outputs.run == 'true' && matrix.ffmpeg_mode == 'static'
+      - name: Build inside Docker
         run: |
           docker run --rm --platform ${{ matrix.platform }} \
             -v ${{ github.workspace }}:/workspace \
@@ -123,86 +66,49 @@ jobs:
               apt-get update && \
               apt-get install -y g++ make wget yasm xz-utils && \
               make FF_VER=${{ needs.get-ffmpeg-version.outputs.version }} IS_RELEASE=1 && \
-              mv untrunc untrunc-linux-${{ matrix.arch }}-static
+              mv untrunc untrunc-linux-${{ matrix.arch }}
             "
 
       - name: Upload Artifact
-        if: steps.should-run.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: untrunc-linux-${{ matrix.arch }}${{ matrix.ffmpeg_mode == 'static' && '-static' || '' }}
-          path: untrunc-linux-${{ matrix.arch }}${{ matrix.ffmpeg_mode == 'static' && '-static' || '' }}
+          name: untrunc-linux-${{ matrix.arch }}
+          path: untrunc-linux-${{ matrix.arch }}
 
   build-macos:
-    name: macOS (${{ matrix.arch }}, ${{ matrix.ffmpeg_mode }})
+    name: macOS (${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
     needs: get-ffmpeg-version
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - os: macos-12
             arch: x86_64
-            ffmpeg_mode: dynamic
-            always: false
-          - os: macos-12
-            arch: x86_64
-            ffmpeg_mode: static
-            always: false
           - os: macos-14
             arch: arm64
-            ffmpeg_mode: dynamic
-            always: false
-          - os: macos-14
-            arch: arm64
-            ffmpeg_mode: static
-            always: false
 
     steps:
-      - name: Check if this job should run
-        id: should-run
-        run: |
-          IS_TAG=${{ startsWith(github.ref, 'refs/tags/') }}
-          ALWAYS=${{ matrix.always }}
-          if [ "$IS_TAG" = "true" ] || [ "$ALWAYS" = "true" ]; then
-            echo "run=true" >> $GITHUB_OUTPUT
-          else
-            echo "run=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: Checkout Code
-        if: steps.should-run.outputs.run == 'true'
         uses: actions/checkout@v4
 
-      - name: Cache FFmpeg tarball (static only)
-        if: steps.should-run.outputs.run == 'true' && matrix.ffmpeg_mode == 'static'
+      - name: Cache FFmpeg tarball
         uses: actions/cache@v4
         with:
           path: /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz
           key: ffmpeg-tarball-macos-${{ matrix.arch }}-${{ needs.get-ffmpeg-version.outputs.version }}
 
-      - name: Build (dynamic)
-        if: steps.should-run.outputs.run == 'true' && matrix.ffmpeg_mode == 'dynamic'
-        run: |
-          brew install ffmpeg
-          export CXXFLAGS="-I$(brew --prefix ffmpeg)/include"
-          export LDFLAGS="-L$(brew --prefix ffmpeg)/lib"
-          make IS_RELEASE=1
-          mv untrunc untrunc-macos-${{ matrix.arch }}
-
-      - name: Build (static)
-        if: steps.should-run.outputs.run == 'true' && matrix.ffmpeg_mode == 'static'
+      - name: Build
         run: |
           brew install yasm wget
           make FF_VER=${{ needs.get-ffmpeg-version.outputs.version }} IS_RELEASE=1
-          mv untrunc untrunc-macos-${{ matrix.arch }}-static
+          mv untrunc untrunc-macos-${{ matrix.arch }}
 
       - name: Upload Artifact
-        if: steps.should-run.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: untrunc-macos-${{ matrix.arch }}${{ matrix.ffmpeg_mode == 'static' && '-static' || '' }}
-          path: untrunc-macos-${{ matrix.arch }}${{ matrix.ffmpeg_mode == 'static' && '-static' || '' }}
+          name: untrunc-macos-${{ matrix.arch }}
+          path: untrunc-macos-${{ matrix.arch }}
 
   release:
     name: Create Release
@@ -225,29 +131,15 @@ jobs:
           body: |
             ## Untrunc Release
 
-            This release contains automated builds for **Linux** and **macOS**.
-
-            ### Dynamic builds (system ffmpeg required)
-            Small binaries that link against the system's ffmpeg at runtime.
-
-            - **Linux**: `untrunc-linux-amd64`, `untrunc-linux-arm64`, `untrunc-linux-armv7`, `untrunc-linux-i386`
-            - **macOS**: `untrunc-macos-x86_64`, `untrunc-macos-arm64`
-
-            ### Static builds (bundled FFmpeg ${{ needs.get-ffmpeg-version.outputs.version }})
-            Larger binaries with ffmpeg built-in — no installation needed.
-
-            - **Linux**: `untrunc-linux-amd64-static`, `untrunc-linux-arm64-static`, `untrunc-linux-armv7-static`, `untrunc-linux-i386-static`
-            - **macOS**: `untrunc-macos-x86_64-static`, `untrunc-macos-arm64-static`
+            Automated builds for **Linux** and **macOS**, compiled with **FFmpeg ${{ needs.get-ffmpeg-version.outputs.version }}** (bundled — no ffmpeg installation needed).
 
             ### Which file to choose?
 
-            | Platform | CPU | Dynamic | Static |
-            |---|---|---|---|
-            | Linux 64-bit (Intel/AMD) | x86_64 | `untrunc-linux-amd64` | `untrunc-linux-amd64-static` |
-            | Linux 64-bit (ARM, e.g. RPi 4/5) | aarch64 | `untrunc-linux-arm64` | `untrunc-linux-arm64-static` |
-            | Linux 32-bit (ARM, e.g. RPi 2/3) | armv7 | `untrunc-linux-armv7` | `untrunc-linux-armv7-static` |
-            | Linux 32-bit (Intel/AMD) | i386 | `untrunc-linux-i386` | `untrunc-linux-i386-static` |
-            | macOS (Intel) | x86_64 | `untrunc-macos-x86_64` | `untrunc-macos-x86_64-static` |
-            | macOS (Apple Silicon M1/M2/M3) | arm64 | `untrunc-macos-arm64` | `untrunc-macos-arm64-static` |
-
-            If the dynamic build fails with a missing library error, use the `-static` variant instead.
+            | Platform | CPU | File |
+            |---|---|---|
+            | Linux 64-bit (Intel/AMD) | x86_64 | `untrunc-linux-amd64` |
+            | Linux 64-bit (ARM, e.g. RPi 4/5) | aarch64 | `untrunc-linux-arm64` |
+            | Linux 32-bit (ARM, e.g. RPi 2/3) | armv7 | `untrunc-linux-armv7` |
+            | Linux 32-bit (Intel/AMD) | i386 | `untrunc-linux-i386` |
+            | macOS (Intel) | x86_64 | `untrunc-macos-x86_64` |
+            | macOS (Apple Silicon M1/M2/M3) | arm64 | `untrunc-macos-arm64` |
