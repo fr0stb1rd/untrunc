@@ -185,3 +185,4 @@ jobs:
             | Linux 32-bit (Intel/AMD) | i386 | `untrunc-linux-i386` |
             | macOS (Intel) | x86_64 | `untrunc-macos-x86_64` |
             | macOS (Apple Silicon M1/M2/M3) | arm64 | `untrunc-macos-arm64` |
+
