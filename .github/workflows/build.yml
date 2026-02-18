@@ -64,7 +64,7 @@ jobs:
             -w /workspace \
             ${{ matrix.image }} /bin/bash -c "
               apt-get update && \
-              apt-get install -y g++ make wget yasm xz-utils && \
+              apt-get install -y g++ make wget nasm xz-utils && \
               make FF_VER=${{ needs.get-ffmpeg-version.outputs.version }} IS_RELEASE=1 && \
               mv untrunc untrunc-linux-${{ matrix.arch }}
             "
@@ -100,7 +100,7 @@ jobs:
 
       - name: Build
         run: |
-          brew install yasm wget
+          brew install nasm wget
           make FF_VER=${{ needs.get-ffmpeg-version.outputs.version }} IS_RELEASE=1
           mv untrunc untrunc-macos-${{ matrix.arch }}
 
