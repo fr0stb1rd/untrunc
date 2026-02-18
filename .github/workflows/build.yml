@@ -30,23 +30,46 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        ffmpeg_mode: [dynamic, static]
         include:
           - arch: amd64
             platform: linux/amd64
             image: debian:12-slim
+            ffmpeg_mode: dynamic
+            always: true
+          - arch: amd64
+            platform: linux/amd64
+            image: debian:12-slim
+            ffmpeg_mode: static
             always: true
           - arch: arm64
             platform: linux/arm64
             image: debian:12-slim
+            ffmpeg_mode: dynamic
+            always: false
+          - arch: arm64
+            platform: linux/arm64
+            image: debian:12-slim
+            ffmpeg_mode: static
             always: false
           - arch: armv7
             platform: linux/arm/v7
             image: debian:12-slim
+            ffmpeg_mode: dynamic
+            always: false
+          - arch: armv7
+            platform: linux/arm/v7
+            image: debian:12-slim
+            ffmpeg_mode: static
             always: false
           - arch: i386
             platform: linux/386
             image: i386/debian:12-slim
+            ffmpeg_mode: dynamic
+            always: false
+          - arch: i386
+            platform: linux/386
+            image: i386/debian:12-slim
+            ffmpeg_mode: static
             always: false
 
     steps:
@@ -117,13 +140,22 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        ffmpeg_mode: [dynamic, static]
         include:
           - os: macos-12
             arch: x86_64
+            ffmpeg_mode: dynamic
+            always: false
+          - os: macos-12
+            arch: x86_64
+            ffmpeg_mode: static
             always: false
           - os: macos-14
             arch: arm64
+            ffmpeg_mode: dynamic
+            always: false
+          - os: macos-14
+            arch: arm64
+            ffmpeg_mode: static
             always: false
 
     steps:
