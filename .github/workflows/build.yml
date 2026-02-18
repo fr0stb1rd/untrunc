@@ -1,0 +1,169 @@
+name: Build Untrunc (Multi-Arch)
+
+on:
+  push:
+    branches: [ "master", "main" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    name: Linux (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            image: debian:12-slim
+          - arch: arm64
+            platform: linux/arm64
+            image: debian:12-slim
+          - arch: armv7
+            platform: linux/arm/v7
+            image: debian:12-slim
+          - arch: i386
+            platform: linux/386
+            image: i386/debian:12-slim
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Build inside Docker
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ${{ matrix.image }} /bin/bash -c "
+              apt-get update && \
+              apt-get install -y libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavresample-dev g++ make wget && \
+              make && \
+              mv untrunc untrunc-linux-${{ matrix.arch }}
+            "
+      
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: untrunc-linux-${{ matrix.arch }}
+          path: untrunc-linux-${{ matrix.arch }}
+
+  build-macos:
+    name: macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-13
+            arch: x86_64
+          - os: macos-14
+            arch: arm64
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Install Dependencies
+        run: brew install ffmpeg
+      
+      - name: Build
+        run: |
+          # Add Homebrew include path to CXXFLAGS so compiler finds ffmpeg headers
+          export CXXFLAGS="-I$(brew --prefix ffmpeg)/include"
+          # Add Homebrew lib path to LDFLAGS so linker finds libraries
+          export LDFLAGS="-L$(brew --prefix ffmpeg)/lib"
+          make
+          mv untrunc untrunc-macos-${{ matrix.arch }}
+      
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: untrunc-macos-${{ matrix.arch }}
+          path: untrunc-macos-${{ matrix.arch }}
+
+  build-windows:
+    name: Windows (${{ matrix.arch }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - msystem: MINGW64
+            arch: x64
+            package_arch: x86_64
+          - msystem: MINGW32
+            arch: x86
+            package_arch: i686
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          update: true
+          install: >-
+            git
+            make
+            mingw-w64-${{ matrix.package_arch }}-gcc
+            mingw-w64-${{ matrix.package_arch }}-ffmpeg
+      
+      - name: Build
+        shell: msys2 {0}
+        run: |
+          make
+          mv untrunc.exe untrunc-windows-${{ matrix.arch }}.exe
+      
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: untrunc-windows-${{ matrix.arch }}.exe
+          path: untrunc-windows-${{ matrix.arch }}.exe
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build-linux, build-macos, build-windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/*
+          body: |
+            ## Untrunc Release
+            
+            This release contains automated builds for **Linux**, **macOS**, and **Windows**.
+            
+            ### How to choose your file:
+            
+            - **Linux**:
+              - `untrunc-linux-amd64`: For standard 64-bit Intel/AMD computers.
+              - `untrunc-linux-arm64`: For 64-bit ARM devices (e.g. Raspberry Pi 4/5).
+              - `untrunc-linux-armv7`: For 32-bit ARM devices (e.g. Raspberry Pi 2/3).
+              - `untrunc-linux-i386`: For older 32-bit Intel/AMD computers.
+            
+            - **macOS**:
+              - `untrunc-macos-x86_64`: For Intel Macs.
+              - `untrunc-macos-arm64`: For Apple Silicon Macs (M1, M2, M3).
+            
+            - **Windows**:
+              - `untrunc-windows-x64.exe`: For standard 64-bit Windows.
+              - `untrunc-windows-x86.exe`: For 32-bit Windows.
+            
+            **Note**: Depending on your system, you may need to install `ffmpeg` libraries separately if they are not already present, as these are dynamically linked builds.
