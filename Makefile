@@ -25,6 +25,8 @@ endif
 
 ifeq ($(OS),Windows_NT)
 	_OS := Windows
+	# Fix: std::byte (C++17) conflicts with 'byte' typedef in Windows headers (rpcndr.h) on GCC 15+
+	CXXFLAGS += -D_RPCNDR_H_NO_BYTE_TYPEDEF
 else
 	_OS := $(shell uname)
 endif
