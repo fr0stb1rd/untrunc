@@ -10,11 +10,13 @@ on:
 
 jobs:
   build-linux:
-    name: Linux (${{ matrix.arch }})
+    name: Linux ${{ matrix.arch }} (${{ matrix.ffmpeg_mode }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        arch: [amd64, arm64, armv7, i386]
+        ffmpeg_mode: [dynamic, static]
         include:
           - arch: amd64
             platform: linux/amd64
@@ -35,102 +37,82 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-      
-      - name: Build inside Docker
+
+      - name: Build (dynamic) inside Docker
+        if: matrix.ffmpeg_mode == 'dynamic'
         run: |
           docker run --rm --platform ${{ matrix.platform }} \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ${{ matrix.image }} /bin/bash -c "
               apt-get update && \
-              apt-get install -y libavformat-dev libavcodec-dev libavutil-dev libswscale-dev g++ make wget && \
-              make && \
+              apt-get install -y libavformat-dev libavcodec-dev libavutil-dev libswscale-dev g++ make && \
+              make IS_RELEASE=1 && \
               mv untrunc untrunc-linux-${{ matrix.arch }}
             "
-      
+
+      - name: Build (static) inside Docker
+        if: matrix.ffmpeg_mode == 'static'
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ${{ matrix.image }} /bin/bash -c "
+              apt-get update && \
+              apt-get install -y g++ make wget yasm xz-utils && \
+              make FF_VER=6.0 IS_RELEASE=1 && \
+              mv untrunc untrunc-linux-${{ matrix.arch }}-static
+            "
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: untrunc-linux-${{ matrix.arch }}
-          path: untrunc-linux-${{ matrix.arch }}
+          name: untrunc-linux-${{ matrix.arch }}${{ matrix.ffmpeg_mode == 'static' && '-static' || '' }}
+          path: untrunc-linux-${{ matrix.arch }}${{ matrix.ffmpeg_mode == 'static' && '-static' || '' }}
 
   build-macos:
-    name: macOS (${{ matrix.arch }})
+    name: macOS ${{ matrix.arch }} (${{ matrix.ffmpeg_mode }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        ffmpeg_mode: [dynamic, static]
         include:
           - os: macos-12
             arch: x86_64
           - os: macos-14
             arch: arm64
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-      
-      - name: Install Dependencies
-        run: brew install ffmpeg
-      
-      - name: Build
-        run: |
-          # Add Homebrew include path to CXXFLAGS so compiler finds ffmpeg headers
-          export CXXFLAGS="-I$(brew --prefix ffmpeg)/include"
-          # Add Homebrew lib path to LDFLAGS so linker finds libraries
-          export LDFLAGS="-L$(brew --prefix ffmpeg)/lib"
-          make
-          mv untrunc untrunc-macos-${{ matrix.arch }}
-      
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: untrunc-macos-${{ matrix.arch }}
-          path: untrunc-macos-${{ matrix.arch }}
 
-  build-windows:
-    name: Windows (${{ matrix.arch }})
-    runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - msystem: MINGW64
-            arch: x64
-            package_arch: x86_64
-          - msystem: MINGW32
-            arch: x86
-            package_arch: i686
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-      
-      - name: Setup MSYS2
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: ${{ matrix.msystem }}
-          update: true
-          install: >-
-            git
-            make
-            mingw-w64-${{ matrix.package_arch }}-gcc
-            mingw-w64-${{ matrix.package_arch }}-ffmpeg
-      
-      - name: Build
-        shell: msys2 {0}
+
+      - name: Build (dynamic)
+        if: matrix.ffmpeg_mode == 'dynamic'
         run: |
-          make
-          mv untrunc.exe untrunc-windows-${{ matrix.arch }}.exe
-      
+          brew install ffmpeg
+          export CXXFLAGS="-I$(brew --prefix ffmpeg)/include"
+          export LDFLAGS="-L$(brew --prefix ffmpeg)/lib"
+          make IS_RELEASE=1
+          mv untrunc untrunc-macos-${{ matrix.arch }}
+
+      - name: Build (static)
+        if: matrix.ffmpeg_mode == 'static'
+        run: |
+          brew install yasm wget
+          make FF_VER=6.0 IS_RELEASE=1
+          mv untrunc untrunc-macos-${{ matrix.arch }}-static
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: untrunc-windows-${{ matrix.arch }}.exe
-          path: untrunc-windows-${{ matrix.arch }}.exe
+          name: untrunc-macos-${{ matrix.arch }}${{ matrix.ffmpeg_mode == 'static' && '-static' || '' }}
+          path: untrunc-macos-${{ matrix.arch }}${{ matrix.ffmpeg_mode == 'static' && '-static' || '' }}
 
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos, build-windows]
+    needs: [build-linux, build-macos]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
@@ -147,23 +129,30 @@ jobs:
           files: artifacts/*
           body: |
             ## Untrunc Release
-            
-            This release contains automated builds for **Linux**, **macOS**, and **Windows**.
-            
-            ### How to choose your file:
-            
-            - **Linux**:
-              - `untrunc-linux-amd64`: For standard 64-bit Intel/AMD computers.
-              - `untrunc-linux-arm64`: For 64-bit ARM devices (e.g. Raspberry Pi 4/5).
-              - `untrunc-linux-armv7`: For 32-bit ARM devices (e.g. Raspberry Pi 2/3).
-              - `untrunc-linux-i386`: For older 32-bit Intel/AMD computers.
-            
-            - **macOS**:
-              - `untrunc-macos-x86_64`: For Intel Macs.
-              - `untrunc-macos-arm64`: For Apple Silicon Macs (M1, M2, M3).
-            
-            - **Windows**:
-              - `untrunc-windows-x64.exe`: For standard 64-bit Windows.
-              - `untrunc-windows-x86.exe`: For 32-bit Windows.
-            
-            **Note**: Depending on your system, you may need to install `ffmpeg` libraries separately if they are not already present, as these are dynamically linked builds.
+
+            This release contains automated builds for **Linux** and **macOS**.
+
+            ### Dynamic builds (system ffmpeg)
+            These are smaller files but require `ffmpeg` to be installed on your system.
+
+            - **Linux**: `untrunc-linux-amd64`, `untrunc-linux-arm64`, `untrunc-linux-armv7`, `untrunc-linux-i386`
+            - **macOS**: `untrunc-macos-x86_64`, `untrunc-macos-arm64`
+
+            ### Static builds (bundled ffmpeg 6.0)
+            These are larger files but are fully self-contained — no ffmpeg installation needed.
+
+            - **Linux**: `untrunc-linux-amd64-static`, `untrunc-linux-arm64-static`, `untrunc-linux-armv7-static`, `untrunc-linux-i386-static`
+            - **macOS**: `untrunc-macos-x86_64-static`, `untrunc-macos-arm64-static`
+
+            ### Which file to choose?
+
+            | Platform | CPU | Recommended |
+            |---|---|---|
+            | Linux 64-bit (Intel/AMD) | x86_64 | `untrunc-linux-amd64` |
+            | Linux 64-bit (ARM, e.g. RPi 4/5) | aarch64 | `untrunc-linux-arm64` |
+            | Linux 32-bit (ARM, e.g. RPi 2/3) | armv7 | `untrunc-linux-armv7` |
+            | Linux 32-bit (Intel/AMD) | i386 | `untrunc-linux-i386` |
+            | macOS (Intel) | x86_64 | `untrunc-macos-x86_64` |
+            | macOS (Apple Silicon M1/M2/M3) | arm64 | `untrunc-macos-arm64` |
+
+            If the dynamic build fails with a missing library error, try the `-static` variant instead.
