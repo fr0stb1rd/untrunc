@@ -76,7 +76,8 @@ jobs:
                 --disable-everything --enable-decoders --disable-vdpau --enable-demuxers --enable-protocol=file \
                 --disable-avdevice --disable-swresample --disable-swscale --disable-avfilter \
                 --disable-xlib --disable-vaapi --disable-zlib --disable-bzlib --disable-lzma && \
-              make -j\$(nproc)
+              make -j\$(nproc) && \
+              chown -R \$(stat -c '%u:%g' /workspace) /workspace/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}
             "
 
       - name: Build untrunc inside Docker
