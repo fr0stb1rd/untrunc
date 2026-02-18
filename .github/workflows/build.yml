@@ -50,21 +50,43 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Cache FFmpeg tarball
+      - name: Cache compiled FFmpeg
+        id: cache-ffmpeg
         uses: actions/cache@v4
         with:
-          path: /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz
-          key: ffmpeg-tarball-linux-${{ matrix.arch }}-${{ needs.get-ffmpeg-version.outputs.version }}
+          path: ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}
+          key: ffmpeg-built-linux-${{ matrix.arch }}-${{ needs.get-ffmpeg-version.outputs.version }}
 
-      - name: Build inside Docker
+      - name: Build FFmpeg inside Docker
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
         run: |
           docker run --rm --platform ${{ matrix.platform }} \
             -v ${{ github.workspace }}:/workspace \
-            -v /tmp:/tmp \
             -w /workspace \
             ${{ matrix.image }} /bin/bash -c "
               apt-get update && \
               apt-get install -y g++ make wget nasm xz-utils && \
+              wget -q -O /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz \
+                https://www.ffmpeg.org/releases/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz && \
+              tar xf /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz && \
+              mv ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}/VERSION \
+                 ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}/VERSION.bak && \
+              cd ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }} && \
+              ./configure --disable-doc --disable-programs \
+                --disable-everything --enable-decoders --disable-vdpau --enable-demuxers --enable-protocol=file \
+                --disable-avdevice --disable-swresample --disable-swscale --disable-avfilter \
+                --disable-xlib --disable-vaapi --disable-zlib --disable-bzlib --disable-lzma && \
+              make -j\$(nproc)
+            "
+
+      - name: Build untrunc inside Docker
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ${{ matrix.image }} /bin/bash -c "
+              apt-get update && \
+              apt-get install -y g++ make && \
               make FF_VER=${{ needs.get-ffmpeg-version.outputs.version }} IS_RELEASE=1 && \
               mv untrunc untrunc-linux-${{ matrix.arch }}
             "
@@ -92,15 +114,34 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Cache FFmpeg tarball
+      - name: Cache compiled FFmpeg
+        id: cache-ffmpeg
         uses: actions/cache@v4
         with:
-          path: /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz
-          key: ffmpeg-tarball-macos-${{ matrix.arch }}-${{ needs.get-ffmpeg-version.outputs.version }}
+          path: ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}
+          key: ffmpeg-built-macos-${{ matrix.arch }}-${{ needs.get-ffmpeg-version.outputs.version }}
 
-      - name: Build
+      - name: Install build tools
+        run: brew install nasm wget
+
+      - name: Build FFmpeg
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
         run: |
-          brew install nasm wget
+          wget -q -O /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz \
+            https://www.ffmpeg.org/releases/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz
+          tar xf /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz
+          mv ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}/VERSION \
+             ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}/VERSION.bak
+          cd ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}
+          ./configure --disable-doc --disable-programs \
+            --disable-everything --enable-decoders --disable-vdpau --enable-demuxers --enable-protocol=file \
+            --disable-avdevice --disable-swresample --disable-swscale --disable-avfilter \
+            --disable-xlib --disable-vaapi --disable-zlib --disable-bzlib --disable-lzma \
+            --disable-audiotoolbox --disable-videotoolbox
+          make -j$(sysctl -n hw.logicalcpu)
+
+      - name: Build untrunc
+        run: |
           make FF_VER=${{ needs.get-ffmpeg-version.outputs.version }} IS_RELEASE=1
           mv untrunc untrunc-macos-${{ matrix.arch }}
 
