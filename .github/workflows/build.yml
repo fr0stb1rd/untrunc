@@ -279,42 +279,47 @@ jobs:
             runner: ubuntu-latest
             platform: linux/amd64
             image: debian:12-slim
-            use_zip: true
+            native: true
             libui_asset: libui-ng-ubuntu-x64-static-release.zip
           - arch: arm64
             runner: ubuntu-24.04-arm
             platform: linux/arm64
             image: debian:12-slim
-            use_zip: true
+            native: true
             libui_asset: libui-ng-ubuntu-arm64-static-release.zip
           - arch: armv7
             runner: ubuntu-latest
             platform: linux/arm/v7
             image: debian:12-slim
-            use_zip: false
-            libui_asset: ""
+            native: false
+            libui_asset: libui-ng-ubuntu-armv7-static-release.zip
           - arch: i386
             runner: ubuntu-latest
             platform: linux/386
             image: i386/debian:12-slim
-            use_zip: false
-            libui_asset: ""
+            native: false
+            libui_asset: libui-ng-ubuntu-i386-static-release.zip
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up QEMU
-        if: matrix.use_zip == false
+        if: matrix.native == false
         uses: docker/setup-qemu-action@v3
 
       - name: Get latest libui-ng release tag
         id: libui-tag
-        if: matrix.use_zip == true
         run: |
-          TAG=$(curl -s https://api.github.com/repos/kojix2/libui-ng/releases/latest \
+          TAG=$(curl -s https://api.github.com/repos/fr0stb1rd/libui-ng/releases/latest \
             | grep '"tag_name"' | head -1 | cut -d '"' -f4)
           echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Download libui-ng static zip
+        run: |
+          curl -sL \
+            "https://github.com/fr0stb1rd/libui-ng/releases/download/${{ steps.libui-tag.outputs.tag }}/${{ matrix.libui_asset }}" \
+            -o libui-ng.zip
 
       - name: Cache compiled FFmpeg
         id: cache-ffmpeg
@@ -323,20 +328,17 @@ jobs:
           path: ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}
           key: ffmpeg-built-linux-${{ matrix.arch }}-${{ needs.get-ffmpeg-version.outputs.version }}
 
-      # ── amd64 / arm64: native runner + kojix2/libui-ng prebuilt zip ───────
+      # ── amd64 / arm64: native runner + fr0stb1rd/libui-ng prebuilt zip ───────
 
       - name: Install deps + libui-ng static (native)
-        if: matrix.use_zip == true
+        if: matrix.native == true
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y g++ make nasm wget libgtk-3-dev pkg-config unzip
-          curl -sL \
-            "https://github.com/kojix2/libui-ng/releases/download/${{ steps.libui-tag.outputs.tag }}/${{ matrix.libui_asset }}" \
-            -o libui-ng.zip
           sudo unzip -q libui-ng.zip -d /usr/local
 
       - name: Build FFmpeg (native)
-        if: matrix.use_zip == true && steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        if: matrix.native == true && steps.cache-ffmpeg.outputs.cache-hit != 'true'
         run: |
           wget -q -O /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz \
             https://www.ffmpeg.org/releases/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz
@@ -351,7 +353,7 @@ jobs:
           make -j$(nproc)
 
       - name: Build untrunc-gui (native)
-        if: matrix.use_zip == true
+        if: matrix.native == true
         run: |
           GTK3_LIBS=$(pkg-config --libs gtk+-3.0)
           make untrunc-gui \
@@ -361,10 +363,10 @@ jobs:
             "EXTRA_LDFLAGS=${GTK3_LIBS}"
           mv untrunc-gui untrunc-gui-linux-${{ matrix.arch }}
 
-      # ── armv7 / i386: Docker + QEMU + libui-ng built from source ──────────
+      # ── armv7 / i386: Docker (+QEMU) + fr0stb1rd/libui-ng prebuilt zip ──────
 
       - name: Build FFmpeg inside Docker (QEMU)
-        if: matrix.use_zip == false && steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        if: matrix.native == false && steps.cache-ffmpeg.outputs.cache-hit != 'true'
         run: |
           docker run --rm --platform ${{ matrix.platform }} \
             -v ${{ github.workspace }}:/workspace \
@@ -386,22 +388,16 @@ jobs:
               chown -R \$(stat -c '%u:%g' /workspace) /workspace/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}
             "
 
-      - name: Build libui-ng from source + untrunc-gui inside Docker (QEMU)
-        if: matrix.use_zip == false
+      - name: Install libui-ng zip + build untrunc-gui inside Docker (QEMU)
+        if: matrix.native == false
         run: |
           docker run --rm --platform ${{ matrix.platform }} \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ${{ matrix.image }} /bin/bash -c "
               apt-get update && \
-              apt-get install -y g++ make cmake git pkg-config libgtk-3-dev && \
-              git clone --depth=1 https://github.com/libui-ng/libui-ng.git /tmp/libui-ng && \
-              cmake -S /tmp/libui-ng -B /tmp/libui-ng/build \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DBUILD_SHARED_LIBS=OFF \
-                -DCMAKE_INSTALL_PREFIX=/usr/local && \
-              cmake --build /tmp/libui-ng/build --parallel \$(nproc) && \
-              cmake --install /tmp/libui-ng/build && \
+              apt-get install -y g++ make unzip pkg-config libgtk-3-dev && \
+              unzip -q libui-ng.zip -d /usr/local && \
               GTK3_LIBS=\$(pkg-config --libs gtk+-3.0) && \
               make untrunc-gui \
                 FF_VER=${{ needs.get-ffmpeg-version.outputs.version }} \
