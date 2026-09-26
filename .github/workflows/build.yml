@@ -176,7 +176,7 @@ jobs:
       matrix:
         include:
           - job: "32"
-            untr_dest: untrunc_x32
+            untr_dest: untrunc-windows-x32
             msystem: MINGW32
             arch: win32
             arch_ui: "386"
@@ -184,7 +184,7 @@ jobs:
             sha_ffmpeg_shared: 40bb6ba68d8d1f586a8a69f4bda47f7b8bae1598dfcc6b90123be63e66fd7400
             sha_libui: e3d2e9a1862fa603d5d7b9d3ccb0692ba79f861bbe70030da32329d23e6fdbef
           - job: "64"
-            untr_dest: untrunc_x64
+            untr_dest: untrunc-windows-x64
             msystem: MINGW64
             arch: win64
             arch_ui: amd64
@@ -435,7 +435,7 @@ jobs:
             ## Untrunc Release
 
             Automated builds for **Linux**, **macOS** and **Windows**, compiled with **FFmpeg ${{ needs.get-ffmpeg-version.outputs.version }}** (bundled — no ffmpeg installation needed).
-            Windows builds use prebuilt FFmpeg 3.3.4 + libui GUI and ship as `untrunc_x32.zip` / `untrunc_x64.zip`.
+            Windows builds use prebuilt FFmpeg 3.3.4 + libui GUI and ship as `untrunc-windows-x32.zip` / `untrunc-windows-x64.zip`.
 
             ### Which file to choose?
 
@@ -447,8 +447,8 @@ jobs:
             | Linux 32-bit (Intel/AMD) | i386 | `untrunc-linux-i386` |
             | macOS (Intel) | x86_64 | `untrunc-macos-x86_64` |
             | macOS (Apple Silicon M1/M2/M3) | arm64 | `untrunc-macos-arm64` |
-            | Windows 64-bit | x86_64 | `untrunc_x64.zip` |
-            | Windows 32-bit | x86 | `untrunc_x32.zip` |
+            | Windows 64-bit | x86_64 | `untrunc-windows-x64.zip` |
+            | Windows 32-bit | x86 | `untrunc-windows-x32.zip` |
 
             ### GUI builds (Linux only, GTK3)
 
