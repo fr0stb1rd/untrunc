@@ -196,12 +196,13 @@ jobs:
 
       - name: Download external artifacts
         run: |
-          ff_base="https://web.archive.org/https://ffmpeg.zeranoe.com/builds"
-          libui_base="https://github.com/andlabs/libui/releases/download/${LIBUI_VER}"
+          # Mirrored in our own release (win-deps-v1) so CI doesn't depend on web.archive.org.
+          # Originals: ffmpeg.zeranoe.com via web.archive.org, libui from andlabs/libui alpha4.1.
+          deps_base="https://github.com/fr0stb1rd/untrunc/releases/download/win-deps-v1"
 
-          curl -fsSL "${ff_base}/${{ matrix.arch }}/dev/ffmpeg-${FF_VER}-${{ matrix.arch }}-dev.zip"       -o ffmpeg-dev.zip
-          curl -fsSL "${ff_base}/${{ matrix.arch }}/shared/ffmpeg-${FF_VER}-${{ matrix.arch }}-shared.zip" -o ffmpeg-shared.zip
-          curl -fsSL "${libui_base}/libui-${LIBUI_VER}-windows-${{ matrix.arch_ui }}-mingw-static.zip"     -o libui-static.zip
+          curl -fsSL "${deps_base}/ffmpeg-${FF_VER}-${{ matrix.arch }}-dev.zip"                   -o ffmpeg-dev.zip
+          curl -fsSL "${deps_base}/ffmpeg-${FF_VER}-${{ matrix.arch }}-shared.zip"                -o ffmpeg-shared.zip
+          curl -fsSL "${deps_base}/libui-${LIBUI_VER}-windows-${{ matrix.arch_ui }}-mingw-static.zip" -o libui-static.zip
 
       - name: Verify checksums (fail-fast)
         run: |
