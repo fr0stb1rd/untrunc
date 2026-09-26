@@ -39,6 +39,8 @@ For FFmpeg versions > 8.1, struct definition mismatches can occur if upstream ch
 | Linux 32-bit (Intel/AMD) | i386 | `untrunc-linux-i386` |
 | macOS (Intel) | x86_64 | `untrunc-macos-x86_64` |
 | macOS (Apple Silicon) | arm64 | `untrunc-macos-arm64` |
+| Windows 64-bit | x86_64 | `untrunc_x64.zip` |
+| Windows 32-bit | x86 | `untrunc_x32.zip` |
 
 #### With system libraries
 
