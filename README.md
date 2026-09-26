@@ -25,7 +25,9 @@ This fork improves the [original](https://github.com/ponchio/untrunc) in the fol
 
 ## Building
 
-Windows and macOS users can download the latest version [here](https://github.com/anthwlock/untrunc/releases/latest).
+Windows users can download the latest version [here](https://github.com/anthwlock/untrunc/releases/latest).\
+In certain cases a specific version of ffmpeg is needed. Untrunc works great with ffmpeg 3.3.9.\
+For FFmpeg versions > 8.1, struct definition mismatches can occur if upstream changes the internal `FFCodec` struct, potentially leading to undefined behavior (see details in [src/ff_internal.h](src/ff_internal.h)).
 
 ### Supported Architectures (Releases)
 
