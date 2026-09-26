@@ -40,8 +40,6 @@ For FFmpeg versions > 8.1, struct definition mismatches can occur if upstream ch
 | macOS (Intel) | x86_64 | `untrunc-macos-x86_64` |
 | macOS (Apple Silicon) | arm64 | `untrunc-macos-arm64` |
 
-In certain cases a specific version of ffmpeg is needed. Untrunc works great with ffmpeg 3.3.9.
-
 #### With system libraries
 
 ```shell
