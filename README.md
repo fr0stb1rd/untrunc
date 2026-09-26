@@ -29,6 +29,8 @@ Restore a damaged (truncated, corrupt, unfinalized) **MP4, M4V, MOV, 3GP, and RS
 - [Docker](#docker)
 - [Snapcraft](#snapcraft)
 - [Arch Linux (AUR)](#arch-linux-aur)
+  - [Pre-built Binaries (Recommended)](#pre-built-binaries-recommended)
+  - [Building from Source (Git)](#building-from-source-git)
 - [Troubleshooting & Tips](#troubleshooting--tips)
 - [Credits & Donations](#credits--donations)
 - [License](#license)
@@ -327,19 +329,72 @@ untrunc-anthwlock /path/to/ok.mp4 /path/to/broken.mp4
 
 ## Arch Linux (AUR)
 
-Untrunc is available in the Arch User Repository:
-- Package: [`untrunc-anthwlock-bin`](https://aur.archlinux.org/packages/untrunc-anthwlock-bin)
+Untrunc is available in the Arch User Repository (AUR) with multiple packaging options:
+
+### Pre-built Binaries (Recommended)
+
+Maintained by [@fr0stb1rd](https://aur.archlinux.org/account/fr0stb1rd). These packages provide standalone pre-compiled binaries with bundled FFmpeg — **no compilation or external FFmpeg dependencies required**. They support multiple CPU architectures (`x86_64`, `aarch64`, `armv7h`, `i686`):
+
+| Package | Type | Description | AUR Link |
+|---|---|---|---|
+| **`untrunc-anthwlock-bin`** | CLI | Pre-built command-line binary (`untrunc`) | [`untrunc-anthwlock-bin`](https://aur.archlinux.org/packages/untrunc-anthwlock-bin) |
+| **`untrunc-anthwlock-gui-bin`** | GUI | Pre-built GTK3 GUI binary (`untrunc-gui`) with desktop launcher & icon | [`untrunc-anthwlock-gui-bin`](https://aur.archlinux.org/packages/untrunc-anthwlock-gui-bin) |
+
+#### Install via AUR helper (paru / yay):
 
 ```bash
-# Using an AUR helper:
+# Install CLI:
 paru -S untrunc-anthwlock-bin
 # or
 yay -S untrunc-anthwlock-bin
 
-# Manual installation:
+# Install GUI:
+paru -S untrunc-anthwlock-gui-bin
+# or
+yay -S untrunc-anthwlock-gui-bin
+```
+
+#### Manual Installation:
+
+```bash
+# CLI:
 git clone https://aur.archlinux.org/untrunc-anthwlock-bin.git
 cd untrunc-anthwlock-bin
 makepkg -si
+
+# GUI:
+git clone https://aur.archlinux.org/untrunc-anthwlock-gui-bin.git
+cd untrunc-anthwlock-gui-bin
+makepkg -si
+```
+
+### Building from Source (Git)
+
+For users who prefer compiling the latest Git master locally against system libraries:
+
+| Package | Type | Description | AUR Link |
+|---|---|---|---|
+| **`untrunc-anthwlock-cli-git`** | CLI | Builds latest CLI from git (uses system `ffmpeg`) | [`untrunc-anthwlock-cli-git`](https://aur.archlinux.org/packages/untrunc-anthwlock-cli-git) |
+| **`untrunc-gui-git`** | CLI + GUI | Builds latest CLI & GUI from git (`libui`, `libvdpau`) | [`untrunc-gui-git`](https://aur.archlinux.org/packages/untrunc-gui-git) |
+| **`untrunc-git`** | CLI | Builds latest CLI from git (`libvdpau`, `zlib`) | [`untrunc-git`](https://aur.archlinux.org/packages/untrunc-git) |
+
+#### Install via AUR helper:
+
+```bash
+# CLI (using system FFmpeg):
+paru -S untrunc-anthwlock-cli-git
+# or
+yay -S untrunc-anthwlock-cli-git
+
+# CLI + GUI (source build):
+paru -S untrunc-gui-git
+# or
+yay -S untrunc-gui-git
+
+# CLI (standard source package):
+paru -S untrunc-git
+# or
+yay -S untrunc-git
 ```
 
 ---
