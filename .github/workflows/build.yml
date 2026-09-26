@@ -148,6 +148,23 @@ jobs:
           name: untrunc-macos-${{ matrix.arch }}
           path: untrunc-macos-${{ matrix.arch }}
 
+  # ---------------------------------------------------------------------------
+  # Windows builds intentionally use the OLD prebuilt FFmpeg 3.3.4 (not latest).
+  # Why:
+  # 1. No newer prebuilts exist in this format: ffmpeg.zeranoe.com shut down in
+  #    2020, so 3.x/4.x dev+shared zips are the last ones available. They are
+  #    mirrored in our own `win-deps-v1` release so CI doesn't depend on
+  #    web.archive.org.
+  # 2. Stability: untrunc reaches into FFmpeg internals (see src/ff_internal.h,
+  #    the FFCodec struct). That internal layout broke/changed in newer FFmpeg
+  #    releases (upstream PRs #283/#285). 3.3.4 predates the breakage, so the
+  #    Windows GUI+CLI build just works without version-specific patches.
+  # 3. Speed/simplicity: downloading prebuilts takes seconds; compiling FFmpeg
+  #    from source on windows-latest (MSYS2) is slow and fragile. Untrunc only
+  #    needs libavformat demuxers/decoders for atom parsing (new codecs are
+  #    handled by its own src/avc1 + src/hvc1 parsers), so old FFmpeg is enough.
+  #    libui is likewise pinned to alpha4.1, matching this toolchain.
+  # ---------------------------------------------------------------------------
   build-windows:
     name: Windows (${{ matrix.arch }})
     runs-on: windows-latest
