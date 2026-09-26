@@ -103,7 +103,14 @@ void Mp4::repairRsvBen(const string& filename) {
 	if (video_track_idx >= 0) {
 		Track& video_track = tracks_[video_track_idx];
 		video_timescale = video_track.timescale_;
-		if (!video_track.times_.empty()) {
+		// CFR reference clips (all Sony cameras) collapse stts into
+		// constant_duration_ and leave times_ empty. Must read it, otherwise
+		// video_duration_per_sample keeps its 1000 default -> fps wrongly 24
+		// instead of 23.976 (24000/1001) -> audio chunk size off by ~96
+		// bytes/GOP -> 1 corrupt video frame/GOP + short audio.
+		if (video_track.constant_duration_ != -1) {
+			video_duration_per_sample = video_track.constant_duration_;
+		} else if (!video_track.times_.empty()) {
 			video_duration_per_sample = video_track.times_[0];
 		}
 		logg(V, "video timescale: ", video_timescale, ", duration per sample: ", video_duration_per_sample, "\n");
@@ -216,7 +223,12 @@ void Mp4::repairRsvBen(const string& filename) {
 	// Audio samples per chunk = GOP duration * audio_sample_rate
 	double fps = (double)video_timescale / video_duration_per_sample;
 	double gop_duration_sec = (double)frames_per_gop / fps;
-	int audio_samples_per_chunk = (int)(gop_duration_sec * audio_sample_rate);
+	// Exact integer rational: samples = frames_per_gop * sample_rate *
+	// dur_per_sample / timescale (rounded). Avoids float truncation that
+	// would drop a sample and re-introduce the boundary error.
+	int audio_samples_per_chunk = (int)(
+		((long long)frames_per_gop * audio_sample_rate * video_duration_per_sample
+		 + video_timescale / 2) / video_timescale);
 	int audio_chunk_size_per_track = audio_samples_per_chunk * audio_sample_size;
 	// Total audio size in RSV is for all tracks combined
 	int total_audio_chunk_size = audio_chunk_size_per_track * max(1, num_audio_tracks);

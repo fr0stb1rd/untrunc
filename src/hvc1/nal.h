@@ -15,6 +15,7 @@ enum {
 	NAL_AUD         = 35,  // Access unit delimiter
 	NAL_EOB_NUT     = 37,  // End of bitstream
 	NAL_FILLER_DATA = 38,
+	NAL_PREFIX_SEI  = 39,
 };
 
 

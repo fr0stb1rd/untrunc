@@ -81,7 +81,6 @@ sudo cp untrunc /usr/local/bin
 
 ```
 brew install ffmpeg yasm
-export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig"
 CPPFLAGS="-I/opt/homebrew/include" LDFLAGS="-L/opt/homebrew/lib" make
 ```
 

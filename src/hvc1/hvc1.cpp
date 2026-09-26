@@ -36,7 +36,6 @@ LenResult getLengths(Codec* self, const uchar* start, uint maxlength) {
 			return r;
 		}
 
-		if (h265IsKeyframe(nal_info.nal_type_)) self->was_keyframe_ = true;
 		if (h265IsSlice(nal_info.nal_type_)) {
 			H265SliceInfo slice_info(nal_info);
 			if (previous_nal.is_ok) {
@@ -50,9 +49,13 @@ LenResult getLengths(Codec* self, const uchar* start, uint maxlength) {
 					return r;
 				}
 			}
+			if (h265IsKeyframe(nal_info.nal_type_)) self->was_keyframe_ = true;
 			seen_slice = true;
 		}
 		else switch(nal_info.nal_type_) {
+		case NAL_PREFIX_SEI:
+			if (seen_slice) return r;
+			break;
 		case NAL_AUD: // Access unit delimiter
 			if (!previous_nal.is_ok)
 				break;
@@ -64,7 +67,7 @@ LenResult getLengths(Codec* self, const uchar* start, uint maxlength) {
 			}
 			break;
 		default:
-			vector<int> dont_warn = {20, 32, 33, 34, 39};
+			vector<int> dont_warn = {20, 32, 33, 34};
 			if (!contains(dont_warn, nal_info.nal_type_))
 				logg(W2, "unhandled nal_type: ", nal_info.nal_type_, "\n");
 			if (nal_info.is_forbidden_set_) {

@@ -8,6 +8,10 @@
 #ifdef __linux__
 #include <sys/prctl.h>
 #endif
+#ifdef _WIN32
+#include <windows.h>
+#include <codecvt>
+#endif
 
 extern "C" {
 #include "libavcodec/avcodec.h"
@@ -479,9 +483,6 @@ void parseMaxPartsize(string& s) {
 }
 
 #ifdef _WIN32
-#include <windows.h>
-#include <codecvt>
-
 string to_utf8(const wchar_t* utf16) {
 	wstring_convert<codecvt_utf8_utf16<wchar_t>, wchar_t> convert;
 	return convert.to_bytes(utf16);
